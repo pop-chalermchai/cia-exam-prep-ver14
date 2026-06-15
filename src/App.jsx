@@ -2,7 +2,7 @@ import React from "react";
 import HomeScreen from "./components/HomeScreen";
 import QuizScreen from "./components/QuizScreen";
 import ResultsScreen from "./components/ResultsScreen";
-import { questions } from "./data/questions";
+import { supabase } from "./lib/supabase";
 
 function shuffleArray(arr) {
   const copy = [...arr];
@@ -14,25 +14,38 @@ function shuffleArray(arr) {
 }
 
 export default function App() {
-  const [screen, setScreen] = React.useState("home"); // "home" | "quiz" | "results"
+  const [screen, setScreen] = React.useState("home");
   const [quizQuestions, setQuizQuestions] = React.useState([]);
   const [answers, setAnswers] = React.useState([]);
-  const [lang, setLang] = React.useState("en"); // "en" | "th"
+  const [lang, setLang] = React.useState("en");
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
 
-  function handleStart({ difficulty, count }) {
-    let pool = questions;
+  async function handleStart({ difficulty, part, count }) {
+    setLoading(true);
+    setError(null);
 
-    if (difficulty === "normal") {
-      pool = questions.filter((q) => q.difficulty === "normal");
-    } else if (difficulty === "hard") {
-      pool = questions.filter((q) => q.difficulty === "hard");
+    try {
+      let query = supabase.from("questions").select("*");
+
+      if (part) query = query.eq("part", part);
+      if (difficulty !== "mixed") query = query.eq("difficulty", difficulty);
+
+      const { data, error: fetchError } = await query;
+
+      if (fetchError) throw fetchError;
+
+      const shuffled = shuffleArray(data);
+      const selected = shuffled.slice(0, Math.min(count, shuffled.length));
+
+      setQuizQuestions(selected);
+      setScreen("quiz");
+    } catch (err) {
+      setError("Failed to load questions. Please try again.");
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-
-    const shuffled = shuffleArray(pool);
-    const selected = shuffled.slice(0, Math.min(count, shuffled.length));
-
-    setQuizQuestions(selected);
-    setScreen("quiz");
   }
 
   function handleFinish(finalAnswers) {
@@ -49,7 +62,13 @@ export default function App() {
   return (
     <>
       {screen === "home" && (
-        <HomeScreen onStart={handleStart} lang={lang} setLang={setLang} />
+        <HomeScreen
+          onStart={handleStart}
+          lang={lang}
+          setLang={setLang}
+          loading={loading}
+          error={error}
+        />
       )}
       {screen === "quiz" && (
         <QuizScreen

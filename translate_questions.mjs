@@ -3,6 +3,12 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const GLOSSARY = readFileSync(join(__dirname, "src/data/materials/glossary_th.txt"), "utf-8");
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -14,32 +20,16 @@ const supabase = createClient(
 );
 
 async function translateOne(q) {
-  const prompt = `คุณเป็นผู้เชี่ยวชาญด้านการตรวจสอบภายใน (Internal Audit) ที่มีความรู้ลึกซึ้งเกี่ยวกับมาตรฐาน IIA และการสอบ CIA
-แปลข้อสอบ CIA ต่อไปนี้จากภาษาอังกฤษเป็นภาษาไทย โดยใช้ศัพท์วิชาชีพการตรวจสอบภายในที่ถูกต้องและเป็นที่ยอมรับในประเทศไทย
+  const prompt = `คุณเป็นผู้เชี่ยวชาญด้านการตรวจสอบภายในที่แปลข้อสอบ CIA จากภาษาอังกฤษเป็นภาษาไทย
+ให้ใช้ศัพท์วิชาชีพตามอภิธานศัพท์จากมาตรฐานการตรวจสอบภายในสากล (Global Internal Audit Standards) ฉบับภาษาไทย ดังนี้:
 
-คำศัพท์ที่ต้องคงไว้เป็นภาษาอังกฤษ (ห้ามแปล): IIA, CIA, CAE, IPPF, Standards, Engagement, Board, Audit Committee
-คำศัพท์วิชาชีพที่ควรแปลให้ถูกต้อง:
-- Internal audit = การตรวจสอบภายใน
-- Chief Audit Executive (CAE) = หัวหน้าผู้บริหารงานตรวจสอบภายใน
-- Objectivity = ความเที่ยงธรรม
-- Independence = ความเป็นอิสระ
-- Risk management = การบริหารความเสี่ยง
-- Governance = การกำกับดูแล
-- Internal control = การควบคุมภายใน
-- Assurance = การให้ความเชื่อมั่น
-- Consulting = การให้คำปรึกษา
-- Due professional care = ความรอบคอบทางวิชาชีพ
-- Proficiency = ความชำนาญ
-- Quality assurance = การประกันคุณภาพ
-- Impairment = การบกพร่อง
-- Conflict of interest = ความขัดแย้งทางผลประโยชน์
-- Fraud = การทุจริต
-- Control environment = สภาพแวดล้อมการควบคุม
-- Scope = ขอบเขต
-- Finding = ประเด็นที่ตรวจพบ
-- Recommendation = ข้อเสนอแนะ
+${GLOSSARY}
 
-ส่งคืนเฉพาะ JSON object เท่านั้น ไม่ต้องมี markdown หรือ code block
+กฎการแปล:
+- ใช้คำศัพท์จากอภิธานศัพท์ข้างต้นเสมอเมื่อพบคำเหล่านั้น
+- คงคำเหล่านี้เป็นภาษาอังกฤษ: IIA, CIA, CAE, IPPF
+- แปลให้อ่านเข้าใจง่าย เป็นภาษาไทยที่เป็นธรรมชาติ
+- ส่งคืนเฉพาะ JSON object เท่านั้น ไม่ต้องมี markdown หรือ code block
 
 คำถาม: ${q.question}
 ตัวเลือก: ${JSON.stringify(q.options)}

@@ -13,31 +13,41 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNidmZ4Z2x5cmVkdWV5Z3d0eGp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MzQ3NDgsImV4cCI6MjA5NzExMDc0OH0.6c7J095nWHHXCFXEEKoOP-YHvk4Iov3p0YojLvjHPZY"
 );
 
-async function translateBatch(questions) {
-  const prompt = `Translate the following CIA exam questions from English to Thai.
-Return ONLY a valid JSON array with the same structure, adding Thai translations.
-Keep technical terms like "IIA", "CIA", "CAE", "IPPF", "Standards" as-is.
+async function translateOne(q) {
+  const prompt = `Translate this CIA exam question from English to Thai.
+Return ONLY a valid JSON object. Keep technical terms like "IIA", "CIA", "CAE", "IPPF", "Standards" as-is.
+Do not include any markdown or code blocks, just raw JSON.
 
-${JSON.stringify(questions.map(q => ({
-  id: q.id,
-  question: q.question,
-  options: q.options,
-  explanation: q.explanation,
-})))}
+Question: ${q.question}
+Options: ${JSON.stringify(q.options)}
+Explanation: ${q.explanation}
 
-Return JSON array with this structure for each item:
-[{"id": <number>, "question_th": "<Thai>", "options_th": ["<Thai A>","<Thai B>","<Thai C>","<Thai D>"], "explanation_th": "<Thai>"}]`;
+Return exactly this JSON structure:
+{"id": ${q.id}, "question_th": "<Thai question>", "options_th": ["<Thai A>","<Thai B>","<Thai C>","<Thai D>"], "explanation_th": "<Thai explanation>"}`;
 
   const response = await anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 8000,
+    max_tokens: 4000,
     messages: [{ role: "user", content: prompt }],
   });
 
-  const text = response.content[0].text;
-  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  const text = response.content[0].text.trim();
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("No JSON found in response");
   return JSON.parse(jsonMatch[0]);
+}
+
+async function translateBatch(questions) {
+  const results = [];
+  for (const q of questions) {
+    try {
+      const t = await translateOne(q);
+      results.push(t);
+    } catch (err) {
+      console.error(`  Skipping question ${q.id}: ${err.message}`);
+    }
+  }
+  return results;
 }
 
 async function main() {
